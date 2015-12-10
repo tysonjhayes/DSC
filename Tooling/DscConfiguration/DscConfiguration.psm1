@@ -34,7 +34,7 @@ $ConfigurationData = @{AllNodes=@(); Credentials=@{}; Applications=@{}; Services
 . $psscriptroot\New-DscNodeMetadata.ps1
 
 . $psscriptroot\Get-AllNodesConfigurationData.ps1
-. $psscriptroot\Get-ConfigurationData.ps1
+. $psscriptroot\Get-DscConfigurationData.ps1
 . $psscriptroot\Get-CredentialConfigurationData.ps1
 . $psscriptroot\Get-ServiceConfigurationData.ps1
 . $psscriptroot\Get-SiteDataConfigurationData.ps1
@@ -49,70 +49,8 @@ $ConfigurationData = @{AllNodes=@(); Credentials=@{}; Applications=@{}; Services
 . $psscriptroot\ConvertTo-CredentialLookup.ps1
 . $psscriptroot\New-Credential.ps1
 . $psscriptroot\Remove-PlainTextPassword.ps1
-
-function Set-DscConfigurationDataPath {
-    param (
-        [parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
-        [string]
-        $Path
-    )
-
-    $script:ConfigurationDataPath = (Resolve-path $Path).Path
-}
-Set-Alias -Name 'Set-ConfigurationDataPath' -Value 'Set-DscConfigurationDataPath'
-
-function Get-DscConfigurationDataPath {
-
-    $script:ConfigurationDataPath
-}
-Set-Alias -Name 'Get-ConfigurationDataPath' -Value 'Get-DscConfigurationDataPath'
-
-function Resolve-DscConfigurationDataPath {
-    param (
-        [parameter()]
-        [string]
-        $Path
-    )
-
-    if ( -not ($psboundparameters.containskey('Path')) ) {
-        if ([string]::isnullorempty($script:ConfigurationDataPath)) {
-            if (test-path $env:ConfigurationDataPath) {
-                $path = $env:ConfigurationDataPath
-            }
-        }
-        else {
-            $path = $script:ConfigurationDataPath
-        }
-    }
-
-    if ( -not ([string]::isnullorempty($path)) ) {
-        Set-DscConfigurationDataPath -path $path
-    }
-
-}
-Set-Alias -Name 'Resolve-ConfigurationDataPath' -Value 'Resolve-DscConfigurationDataPath'
-
-function Set-DscConfigurationCertificate {
-    param (
-        [parameter(Mandatory)]
-        [string]
-        $CertificateThumbprint
-    )
-
-    $path = "Cert:\LocalMachine\My\$CertificateThumbprint"
-
-    if (Test-Path -Path $path)
-    {
-        $script:LocalCertificateThumbprint = $CertificateThumbprint
-        $script:LocalCertificatePath = $path
-    }
-    else
-    {
-        throw "Certificate '$Thumbprint' does not exist in the Local Computer\Personal certificate store."
-    }
-}
-
-function Get-DscConfigurationCertificate {
-    $script:LocalCertificateThumbprint
-}
+. $psscriptroot\Get-DscConfigurationDataPath.ps1
+. $psscriptroot\Set-DscConfigurationDataPath.ps1
+. $psscriptroot\Resolve-DscConfigurationDataPath.ps1
+. $psscriptroot\Set-DscConfigurationCertificate.ps1
+. $psscriptroot\Get-DscConfigurationCertificate.ps1

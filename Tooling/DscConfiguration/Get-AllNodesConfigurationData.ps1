@@ -21,7 +21,3 @@ function Get-AllNodesConfigurationData
         )
     }
 }
-
-
-
-

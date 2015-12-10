@@ -42,7 +42,3 @@ function Get-Hashtable
         }
     }
 }
-
-
-
-

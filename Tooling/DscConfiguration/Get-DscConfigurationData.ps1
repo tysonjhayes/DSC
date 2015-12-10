@@ -21,14 +21,23 @@ function Get-DscConfigurationData
 
     begin {
 
-        if (($script:ConfigurationData -eq $null) -or $force) {
-            $script:ConfigurationData = @{ AllNodes = @(); SiteData = @{}; Applications = @{}; Services=@{}; Credentials = @{} }
+        if (($script:ConfigurationData -eq $null) -or $force)
+        {
+            $script:ConfigurationData = @{
+                AllNodes = @();
+                SiteData = @{};
+                Applications = @{};
+                Services=@{};
+                Credentials = @{}
+            }
         }
 
         $ResolveConfigurationDataPathParams = @{}
-        if ($psboundparameters.containskey('path')) {
+        if ($psboundparameters.containskey('path'))
+        {
             $ResolveConfigurationDataPathParams.Path = $path
         }
+
         Resolve-ConfigurationDataPath @ResolveConfigurationDataPathParams
 
         if ($CertificateThumbprint)
@@ -36,8 +45,8 @@ function Get-DscConfigurationData
             Set-DscConfigurationCertificate -CertificateThumbprint $CertificateThumbprint
         }
     }
-    end {
-
+    end
+    {
         Get-AllNodesConfigurationData
 
         Write-Verbose 'Checking for filters of AllNodes.'
