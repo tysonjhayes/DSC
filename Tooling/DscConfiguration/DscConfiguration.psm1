@@ -38,8 +38,7 @@ $ConfigurationData = @{AllNodes=@(); Credentials=@{}; Applications=@{}; Services
 . $psscriptroot\Get-CredentialConfigurationData.ps1
 . $psscriptroot\Get-ServiceConfigurationData.ps1
 . $psscriptroot\Get-SiteDataConfigurationData.ps1
-. $psscriptroot\Get-EncryptedPassword.ps1
-. $psscriptroot\Resolve-ConfigurationProperty.ps1
+. $psscriptroot\Get-DscEncryptedPassword.ps1
 . $psscriptroot\Test-ConfigurationPropertyExists.ps1
 
 . $psscriptroot\Add-EncryptedPassword.ps1
@@ -54,3 +53,4 @@ $ConfigurationData = @{AllNodes=@(); Credentials=@{}; Applications=@{}; Services
 . $psscriptroot\Resolve-DscConfigurationDataPath.ps1
 . $psscriptroot\Set-DscConfigurationCertificate.ps1
 . $psscriptroot\Get-DscConfigurationCertificate.ps1
+. $psscriptroot\Resolve-DscConfigurationProperty.ps1

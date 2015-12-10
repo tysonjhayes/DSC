@@ -14,7 +14,3 @@ function Get-CredentialConfigurationData
             Get-DscEncryptedPassword -StoreName { $_.Name -replace '\.encrypted' -replace '\.psd1' }
     }
 }
-
-
-
-

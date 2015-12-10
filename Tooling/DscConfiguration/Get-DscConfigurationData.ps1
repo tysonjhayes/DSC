@@ -9,36 +9,24 @@ function Get-DscConfigurationData
         [ValidateNotNullOrEmpty()]
         [string] $CertificateThumbprint,
 
-        [parameter(ParameterSetName = 'NameFilter')]
-        [string] $Name,
+        # [parameter(ParameterSetName = 'NameFilter')]
+        # [string] $Name,
 
-        [parameter(ParameterSetName = 'NodeNameFilter')]
-        [string] $NodeName,
+        # [parameter(ParameterSetName = 'NodeNameFilter')]
+        # [string] $NodeName,
 
         [parameter()]
         [switch] $Force
     )
 
     begin {
-
-        if (($script:ConfigurationData -eq $null) -or $force)
-        {
-            $script:ConfigurationData = @{
-                AllNodes = @();
-                SiteData = @{};
-                Applications = @{};
-                Services=@{};
-                Credentials = @{}
-            }
-        }
-
         $ResolveConfigurationDataPathParams = @{}
         if ($psboundparameters.containskey('path'))
         {
             $ResolveConfigurationDataPathParams.Path = $path
         }
 
-        Resolve-ConfigurationDataPath @ResolveConfigurationDataPathParams
+        Resolve-DscConfigurationDataPath @ResolveConfigurationDataPathParams
 
         if ($CertificateThumbprint)
         {
@@ -47,29 +35,41 @@ function Get-DscConfigurationData
     }
     end
     {
-        Get-AllNodesConfigurationData
-
-        Write-Verbose 'Checking for filters of AllNodes.'
-        switch ($PSCmdlet.ParameterSetName)
+        if (($script:ConfigurationData -eq $null) -or $force)
         {
-            'NameFilter' {
-                Write-Verbose "Filtering for nodes with the Name $Name"
-                $script:ConfigurationData.AllNodes = $script:ConfigurationData.AllNodes.Where({$_.Name -like $Name})
-            }
-            'NodeNameFilter' {
-                Write-Verbose "Filtering for nodes with the GUID of $NodeName"
-                $script:ConfigurationData.AllNodes = $script:ConfigurationData.AllNodes.Where({$_.NodeName -like $NodeName})
-            }
-            default {
+            $nodeNames = Get-ChildItem -Path $Path -Directory | ForEach-Object {$_.Name} | Where-Object {$_.Name -ne 'Configuration'}
+
+            $script:ConfigurationData = $null
+
+            foreach ($name in $nodeNames)
+            {
+                $script:ConfigurationData += @{$Name = @{}}
             }
         }
-        Write-Verbose 'Loading Site Data'
-        Get-SiteDataConfigurationData
-        Write-Verbose 'Loading Services Data'
-        Get-ServiceConfigurationData
-        Write-Verbose 'Loading Credential Data'
-        Get-CredentialConfigurationData
 
+        foreach ($key in $script:ConfigurationData.Keys)
+        {
+            if ($key -eq 'Credentials')
+            {
+                $credPath = Join-Path -Path $script:ConfigurationDataPath -ChildPath "$key\*.psd1.encrypted"
+                foreach ($item in (Get-ChildItem $credPath))
+                {
+                    $storeName = $item.Name -replace '\.encrypted' -replace '\.psd1'
+                    $script:ConfigurationData.$key.Add($storeName,(Get-DscEncryptedPassword -StoreName $storeName))
+                }
+            }
+            else
+            {
+                $nodePath = Join-Path -Path $script:ConfigurationDataPath -ChildPath "$key\*.psd1"
+                foreach ( $item in (Get-ChildItem $nodePath) )
+                {
+                    Write-Verbose "Loading data for site $($item.basename) from $($item.fullname)."
+                    $script:ConfigurationData.$key.Add($item.BaseName, (Get-Hashtable $item.FullName))
+                }
+            }
+        }
+
+        $breakvar = $true;
         return $script:ConfigurationData
     }
 }

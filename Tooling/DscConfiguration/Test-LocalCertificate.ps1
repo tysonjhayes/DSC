@@ -21,7 +21,3 @@ function Test-LocalCertificate
         return $false
     }
 }
-
-
-
-
