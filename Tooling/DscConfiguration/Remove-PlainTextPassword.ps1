@@ -10,7 +10,3 @@ function Remove-PlainTextPassword
     Write-Verbose "Removing plain text credentials from $path"
     Remove-Item $path -Confirm:$false -Force
 }
-
-
-
-

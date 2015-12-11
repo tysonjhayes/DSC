@@ -2,7 +2,7 @@ function Resolve-DscConfigurationProperty
 {
     <#
         .Synopsis
-            Searches DSC ConfigurationData metadata for a property. 
+            Searches DSC ConfigurationData metadata for a property.
         .DESCRIPTION
             Searches DSC ConfigurationData metadata for a property. Getting the value based on this precident:
                 $ConfigurationData.AllNodes.Node.Services.Name.PropertyName
@@ -11,11 +11,11 @@ function Resolve-DscConfigurationProperty
                 $ConfigurationData.AllNodes.Node.PropertyName
                 $ConfigurationData.Sites.Name.PropertyName
                 $ConfigurationData.PropertyName
-            
+
             If -RsolutionBehavior AllValues used then array of values returned.
 
         .EXAMPLE
- $ConfigurationData = @{
+            $ConfigurationData = @{
                 AllNodes = @(
                     @{
                         Name='Web01'
@@ -30,29 +30,29 @@ function Resolve-DscConfigurationProperty
                         Name='Web03'
                         DataSource = 'ValueFromNode'
                     }
-                    
+
                 )
-                SiteData = @{ 
-                    NY = @{ 
+                SiteData = @{
+                    NY = @{
                         Services = @{
                             MyTestService = @{
-                                DataSource = 'ValueFromSite' 
+                                DataSource = 'ValueFromSite'
                             }
                         }
-                    } 
+                    }
                 }
                 Services = @{
                     MyTestService = @{
                         Nodes = @('Web01', 'Web03')
                         DataSource = 'ValueFromService'
                     }
-                } 
+                }
             }
-            
+
             Foreach ($Node in $ConfigurationData.AllNodes) {
-                
+
                 $Node.Name
-                Resolve-DscConfigurationProperty -Node $Node -PropertyName DataSource -ConfigurationData $ConfigurationData 
+                Resolve-DscConfigurationProperty -Node $Node -PropertyName DataSource -ConfigurationData $ConfigurationData
             }
 
             Web01
@@ -73,7 +73,7 @@ function Resolve-DscConfigurationProperty
                      @{
                         Name='SQL01'
                     }
-                    
+
                 )
                 SiteData = @{ }
                 Services = @{
@@ -81,11 +81,11 @@ function Resolve-DscConfigurationProperty
                         Nodes = @('Web[0-9][0-9]')
                         DataSource = 'ValueFromService'
                     }
-                } 
+                }
             }
-            
+
             Foreach ($Node in $ConfigurationData.AllNodes) {
-                
+
                 $Node.Name
                 Resolve-DscConfigurationProperty -Node $Node -PropertyName DataSource -ConfigurationData $ConfigurationData -DefaultValue 'ValueFromDefault'
             }
@@ -96,38 +96,53 @@ function Resolve-DscConfigurationProperty
             Web02
             ValueFromService
             SQL01
-            ValueFromDefault    
+            ValueFromDefault
     #>
 
-    [cmdletbinding()]
-    param (
-        #The current node being evaluated for the specified property.
+    [CmdletBinding(DefaultParameterSetName='DefaultOrder')]
+    param
+    (
+        # The current node being evaluated for the specified property.
+        [parameter(Mandatory)]
         [System.Collections.Hashtable] $Node,
 
-        #By default, all services associated with a Node are checked for the specified Property.  If you want to filter this down to specific service(s), pass one or more strings to this parameter.  Wildcards are allowed.
-        [ValidateNotNullOrEmpty()]
-        [string[]] $ServiceName = '*',
-
-        #The property that will be checked for.
+        # The property that will be checked for.
         [parameter(Mandatory)]
         [string] $PropertyName,
 
-        #By default, all results must return just one entry.  If you want to fetch values from multiple services or from all scopes, set this parameter to 'OneLevel' or 'AllValues', respectively.
+        # If you want to override the default behavior of checking up-scope for configuration data,
+        # it can be supplied here.
+        [System.Collections.Hashtable] $ConfigurationData,
+
+        # If the specified PropertyName is not found in the hashtable and you specify a default value,
+        # that value will be returned.  If the specified PropertyName is not found and you have not specified
+        # a default value, the function will throw an error.
+        [object] $DefaultValue,
+
+        # By default, all services associated with a Node are checked for the specified Property.
+        # If you want to filter this down to specific service(s), pass one or more strings to this parameter.
+        # Wildcards are allowed.
+        [ValidateNotNullOrEmpty()]
+        [string[]] $ServiceName = '*',
+
+        # By default, all results must return just one entry.
+        # If you want to fetch values from multiple services or from all scopes,
+        # set this parameter to 'OneLevel' or 'AllValues', respectively.
         [ValidateSet('SingleValue', 'OneLevel', 'AllValues')]
         [string] $ResolutionBehavior = 'SingleValue',
 
-        #If you want to override the default behavior of checking up-scope for configuration data, it can be supplied here.
-        [System.Collections.Hashtable] $ConfigurationData,
+        [parameter(ParameterSetName = 'FileOrder')]
+        [string] $Path,
 
-        #If the specified PropertyName is not found in the hashtable and you specify a default value, that value will be returned.  If the specified PropertyName is not found and you have not specified a default value, the function will throw an error.
-        [object] $DefaultValue
+        [parameter(ParameterSetName = 'ParameterOrder')]
+        [string[]] $OverrideOrder
     )
 
-    Write-Verbose ""
+    Write-Verbose ''
     if ($null -eq $ConfigurationData)
     {
-        Write-Verbose ""
-        Write-Verbose "Resolving ConfigurationData"
+        Write-Verbose ''
+        Write-Verbose 'Resolving ConfigurationData'
 
         $ConfigurationData = $PSCmdlet.GetVariableValue('ConfigurationData')
 
@@ -141,30 +156,68 @@ function Resolve-DscConfigurationProperty
 
     Write-Verbose "Starting to evaluate $($Node.Name) for PropertyName: $PropertyName and resolution behavior: $ResolutionBehavior"
 
-    if ($doGetAllResults -or $Value.count -eq 0)
+    switch ($PSCmdlet.ParameterSetName)
     {
-        $Value += @(Get-ServiceValue -Node $Node -ConfigurationData $ConfigurationData -PropertyName $PropertyName -ServiceName $ServiceName -AllValues:$doGetAllResults)
-        Write-Verbose "Value after checking services is $Value"
+        'FileOrder' {
+            $ResolutionOrder = @(Get-Content $Path)
+        }
+        'ParameterOrder' {
+            $ResolutionOrder = $OverrideOrder
+        }
+        default {
+            $ResolutionOrder = @('Services', 'AllNodes','SiteData','All')
+        }
     }
 
-    if ($doGetAllResults -or $Value.count -eq 0)
+    foreach ($resolution in $resolutionOrder)
     {
-        $Value += @(Get-NodeValue -Node $Node -ConfigurationData $ConfigurationData -PropertyName $PropertyName)
-        Write-Verbose "Value after checking the node is $Value"
-    }
+        if ($doGetAllResults -or $Value.count -eq 0)
+        {
+            $resolved = $null
 
-    if ($doGetAllResults -or $Value.count -eq 0)
-    {
-        $Value += @(Get-SiteValue -Node $Node -ConfigurationData $ConfigurationData -PropertyName $PropertyName)
-        Write-Verbose "Value after checking the site is $Value"
-    }
+            if ($Node.ContainsKey('Location'))
+            {
+                $Site = $Node.Location
+            }
 
-    if ($doGetAllResults -or $Value.count -eq 0)
-    {
-        $Value += @(Get-GlobalValue -ConfigurationData $ConfigurationData -PropertyName $PropertyName)
-        Write-Verbose "Value after checking the global is $Value"
-    }
+            switch ($resolution)
+            {
+                'All' {
+                    Write-Verbose "    Checking Site All"
+                    if (Resolve-HashtableProperty -Hashtable $ConfigurationData -PropertyName "SiteData\All\$PropertyName" -Value ([ref] $resolved))
+                    {
+                        Write-Verbose "        Found Site Value: $resolved"
+                        $Value += @($resolved)
+                    }
 
+                    Write-Verbose "Value after checking the global is $Value"
+                }
+                'AllNodes' {
+                    Write-Verbose "    Checking Node: $($Node.Name)"
+
+                    if (Resolve-HashtableProperty -Hashtable $Node -PropertyName $PropertyName -Value ([ref] $resolved))
+                    {
+                        Write-Verbose "        Found Node Value: $resolved"
+                        $value += @($resolved)
+                    }
+                    Write-Verbose "Value after checking the node is $Value"
+                }
+                'Services' {
+                    $Value += @(Get-ServiceValue -Node $Node -ConfigurationData $ConfigurationData -PropertyName $PropertyName -ServiceName $ServiceName -AllValues:$doGetAllResults)
+                    Write-Verbose "Value after checking services is $Value"
+                }
+                default {
+                    if ( Resolve-HashtableProperty `
+                        -Hashtable $ConfigurationData `
+                        -PropertyName "$resolution\$Site\$PropertyName" `
+                        -Value ([ref] $resolved) )
+                    {
+                        $value += $resolved
+                    }
+                }
+            }
+        }
+    }
 
     if (($ResolutionBehavior -eq 'SingleValue') -and ($Value.count -gt 1))
     {
@@ -191,15 +244,15 @@ Set-Alias -Name 'Resolve-ConfigurationProperty' -Value 'Resolve-DscConfiguration
 function Get-ServiceValue
 {
     [CmdletBinding()]
-    param (
+    param
+    (
         [hashtable] $Node,
         [string] $PropertyName,
         [hashtable] $ConfigurationData,
         [string[]] $ServiceName = '*',
+        [string[]] $ResolutionOrder,
         [switch] $AllValues
     )
-
-    if ($null -eq $Node) { return }
 
     $servicesTable = $ConfigurationData['Services']
     if ($servicesTable -isnot [hashtable]) { return }
@@ -264,7 +317,7 @@ function Find-NodeInService
     [OutputType([bool])]
     Param
     (
-        # ConfigurationData Node Hashtable     
+        # ConfigurationData Node Hashtable
         [hashtable]
         $Node,
 
@@ -272,41 +325,38 @@ function Find-NodeInService
         [String[]]
         $ServiceNodes
     )
-    foreach ($serviceNode in $ServiceNodes) 
+
+    foreach ($serviceNode in $ServiceNodes)
     {
-        
         if ($serviceNode.IndexOfAny('\.$^+?{}[]') -ge 0)
         {
-           Write-Verbose   "Checking if Node [$($node.Name)] -match [$serviceNode]"
+            Write-Verbose   "Checking if Node [$($node.Name)] -match [$serviceNode]"
             if ($node.Name -Match $serviceNode)
             {
-                
                return $true
             }
-
         }
         elseif ($serviceNode.contains('*'))
         {
-            
-           Write-Verbose   "Checking if Node [$($node.Name)] -like [$serviceNode]"
+
+            Write-Verbose   "Checking if Node [$($node.Name)] -like [$serviceNode]"
             if ($node.Name -like $serviceNode)
             {
-               
                return $true
             }
         }
-        else 
+        else
         {
-           Write-Verbose   "Checking if Node [$($node.Name)] -eq [$serviceNode]"
+            Write-Verbose   "Checking if Node [$($node.Name)] -eq [$serviceNode]"
             if ($node.Name -eq $serviceNode)
             {
                return  $true
             }
         }
     }
+
     return $false
 }
-
 
 function ShouldProcessService
 {
@@ -320,101 +370,18 @@ function ShouldProcessService
     $isNodeAssociatedWithService = ($Node.Name -and (Find-NodeInService -Node $Node -ServiceNodes $Service.Nodes)) -or
                                    ($Node['MemberOfServices'] -contains $ServiceName)
 
-    if (-not $isNodeAssociatedWithService)
+    if ($isNodeAssociatedWithService)
     {
-        return $false
-    }
-
-    foreach ($pattern in $Filter)
-    {
-        if ($ServiceName -like $pattern)
+        foreach ($pattern in $Filter)
         {
-            return $true
+            if ($ServiceName -like $pattern)
+            {
+                return $true
+            }
         }
     }
 
     return $false
-}
-
-function Get-NodeValue
-{
-    [cmdletbinding()]
-    param (
-        [System.Collections.Hashtable]
-        $Node,
-        [string]
-        $PropertyName,
-        [System.Collections.Hashtable]
-        $ConfigurationData
-    )
-
-    if ($null -eq $Node) { return }
-
-    $resolved = $null
-
-    Write-Verbose "    Checking Node: $($Node.Name)"
-
-    if (Resolve-HashtableProperty -Hashtable $Node -PropertyName $PropertyName -Value ([ref] $resolved))
-    {
-        Write-Verbose "        Found Node Value: $resolved"
-        $resolved
-    }
-
-    Write-Verbose "    Finished checking Node $($Node.Name)"
-}
-
-function Get-SiteValue
-{
-    [cmdletbinding()]
-    param (
-        [System.Collections.Hashtable]
-        $Node,
-        [string]
-        $PropertyName,
-        [System.Collections.Hashtable]
-        $ConfigurationData
-    )
-
-    if ($null -eq $Node -or -not $Node.ContainsKey('Location')) { return }
-
-    return Resolve-SiteProperty -PropertyName $PropertyName -ConfigurationData $ConfigurationData -Site $Node.Location
-}
-
-function Get-GlobalValue
-{
-    [cmdletbinding()]
-    param (
-        [string]
-        $PropertyName,
-        [System.Collections.Hashtable]
-        $ConfigurationData
-    )
-
-    return Resolve-SiteProperty -ConfigurationData $ConfigurationData -PropertyName $PropertyName -Site All
-}
-
-function Resolve-SiteProperty
-{
-    [cmdletbinding()]
-    param (
-        [string]
-        $PropertyName,
-        [System.Collections.Hashtable]
-        $ConfigurationData,
-        [string]
-        $Site
-    )
-
-    $resolved = $null
-
-    Write-Verbose "    Checking Site $Site"
-    if (Resolve-HashtableProperty -Hashtable $ConfigurationData -PropertyName "SiteData\$Site\$PropertyName" -Value ([ref] $resolved))
-    {
-        Write-Verbose "        Found Site Value: $resolved"
-        $resolved
-    }
-
-    Write-Verbose "    Finished checking Site $Site"
 }
 
 function Resolve-HashtableProperty

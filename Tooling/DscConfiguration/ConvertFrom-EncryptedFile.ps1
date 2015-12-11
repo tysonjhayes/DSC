@@ -173,6 +173,3 @@ Function ConvertFrom-EncryptedFile
         }
     }
 }
-
-
-

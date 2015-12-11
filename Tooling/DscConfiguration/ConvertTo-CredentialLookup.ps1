@@ -25,7 +25,3 @@ function ConvertTo-CredentialLookup
         $CredentialHashtable
     }
 }
-
-
-
-

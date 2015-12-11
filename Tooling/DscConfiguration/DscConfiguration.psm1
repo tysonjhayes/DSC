@@ -25,7 +25,7 @@ else
     $LocalCertificatePath = ''
 }
 
-$ConfigurationData = @{AllNodes=@(); Credentials=@{}; Applications=@{}; Services=@{}; SiteData =@{}}
+# $ConfigurationData = @{AllNodes=@(); Credentials=@{}; Applications=@{}; Services=@{}; SiteData =@{}}
 
 . $psscriptroot\Get-Hashtable.ps1
 . $psscriptroot\Test-LocalCertificate.ps1
@@ -33,15 +33,11 @@ $ConfigurationData = @{AllNodes=@(); Credentials=@{}; Applications=@{}; Services
 . $psscriptroot\New-ConfigurationDataStore.ps1
 . $psscriptroot\New-DscNodeMetadata.ps1
 
-. $psscriptroot\Get-AllNodesConfigurationData.ps1
 . $psscriptroot\Get-DscConfigurationData.ps1
 . $psscriptroot\Get-CredentialConfigurationData.ps1
-. $psscriptroot\Get-ServiceConfigurationData.ps1
-. $psscriptroot\Get-SiteDataConfigurationData.ps1
 . $psscriptroot\Get-DscEncryptedPassword.ps1
-. $psscriptroot\Test-ConfigurationPropertyExists.ps1
 
-. $psscriptroot\Add-EncryptedPassword.ps1
+. $psscriptroot\Add-DscEncryptedPassword.ps1
 . $psscriptroot\Import-DscCredentialFile.ps1
 . $psscriptroot\Export-DscCredentialFile.ps1
 . $psscriptroot\ConvertFrom-EncryptedFile.ps1
@@ -54,3 +50,4 @@ $ConfigurationData = @{AllNodes=@(); Credentials=@{}; Applications=@{}; Services
 . $psscriptroot\Set-DscConfigurationCertificate.ps1
 . $psscriptroot\Get-DscConfigurationCertificate.ps1
 . $psscriptroot\Resolve-DscConfigurationProperty.ps1
+. $psscriptroot\Test-DscConfigurationPropertyExists.ps1

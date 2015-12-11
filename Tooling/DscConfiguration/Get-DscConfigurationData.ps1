@@ -9,14 +9,11 @@ function Get-DscConfigurationData
         [ValidateNotNullOrEmpty()]
         [string] $CertificateThumbprint,
 
-        # [parameter(ParameterSetName = 'NameFilter')]
-        # [string] $Name,
+        [parameter(ParameterSetName = 'NameFilter')]
+        [string] $Name,
 
-        # [parameter(ParameterSetName = 'NodeNameFilter')]
-        # [string] $NodeName,
-
-        [parameter()]
-        [switch] $Force
+        [parameter(ParameterSetName = 'NodeNameFilter')]
+        [string] $NodeName
     )
 
     begin {
@@ -35,41 +32,67 @@ function Get-DscConfigurationData
     }
     end
     {
-        if (($script:ConfigurationData -eq $null) -or $force)
+        # Filter out Configuration as we read it in else where.
+        $nodeNames = Get-ChildItem -Path $Path -Directory | ForEach-Object {$_.Name} | Where-Object {$_ -ne 'Configuration'}
+
+        $script:ConfigurationData = @{}
+
+        foreach ($key in $nodeNames)
         {
-            $nodeNames = Get-ChildItem -Path $Path -Directory | ForEach-Object {$_.Name} | Where-Object {$_.Name -ne 'Configuration'}
+            $nodePath = Join-Path -Path $script:ConfigurationDataPath -ChildPath "$key\*.psd1"
 
-            $script:ConfigurationData = $null
-
-            foreach ($name in $nodeNames)
+            switch ($key)
             {
-                $script:ConfigurationData += @{$Name = @{}}
+                'Credentials' {
+                    $credPath = Join-Path -Path $script:ConfigurationDataPath -ChildPath "$key\*.psd1.encrypted"
+
+                    $credentials = @{}
+                    foreach ($item in (Get-ChildItem $credPath))
+                    {
+                        $storeName = $item.Name -replace '\.encrypted' -replace '\.psd1'
+                        $credentials.Add($storeName,(Get-DscEncryptedPassword -StoreName $storeName))
+                    }
+
+                    $script:ConfigurationData.Add($key, $credentials)
+                }
+                'AllNodes' {
+                    $script:ConfigurationData.Add('AllNodes',@(
+                        Get-ChildItem $nodePath |
+                        Get-Hashtable |
+                        ForEach-Object {
+                            Write-Verbose "Adding Node: $($_.Name)"
+                            $_
+                        })
+                    )
+                }
+                default {
+                    $defaultHash = @{}
+                    foreach ( $item in (Get-ChildItem $nodePath) )
+                    {
+                        Write-Verbose "Loading data for site $($item.BaseName) from $($item.FullName)."
+                        $defaultHash.Add($item.BaseName, (Get-Hashtable $item.FullName))
+                    }
+
+                    $script:ConfigurationData.Add($key, $defaultHash)
+                }
             }
         }
 
-        foreach ($key in $script:ConfigurationData.Keys)
+        Write-Verbose 'Checking for filters of AllNodes.'
+        switch ($PSCmdlet.ParameterSetName)
         {
-            if ($key -eq 'Credentials')
-            {
-                $credPath = Join-Path -Path $script:ConfigurationDataPath -ChildPath "$key\*.psd1.encrypted"
-                foreach ($item in (Get-ChildItem $credPath))
-                {
-                    $storeName = $item.Name -replace '\.encrypted' -replace '\.psd1'
-                    $script:ConfigurationData.$key.Add($storeName,(Get-DscEncryptedPassword -StoreName $storeName))
-                }
+            'NameFilter' {
+                Write-Verbose "Filtering for nodes with the Name $Name"
+                $script:ConfigurationData.AllNodes = $script:ConfigurationData.AllNodes.Where({$_.Name -like $Name})
             }
-            else
-            {
-                $nodePath = Join-Path -Path $script:ConfigurationDataPath -ChildPath "$key\*.psd1"
-                foreach ( $item in (Get-ChildItem $nodePath) )
-                {
-                    Write-Verbose "Loading data for site $($item.basename) from $($item.fullname)."
-                    $script:ConfigurationData.$key.Add($item.BaseName, (Get-Hashtable $item.FullName))
-                }
+            'NodeNameFilter' {
+                Write-Verbose "Filtering for nodes with the GUID of $NodeName"
+                $script:ConfigurationData.AllNodes = $script:ConfigurationData.AllNodes.Where({$_.NodeName -like $NodeName})
+            }
+            default {
             }
         }
 
-        $breakvar = $true;
         return $script:ConfigurationData
     }
 }
